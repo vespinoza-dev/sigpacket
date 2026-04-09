@@ -349,12 +349,29 @@ function updateDeleteSelectedButton() {
     btn.disabled = getSelectedSignatureIndexes().length === 0;
 }
 
+function toggleSelectAll(checked) {
+    const allCbs = [...document.querySelectorAll('#matrix-tbody input.sig-row-cb')]
+        .filter(cb => cb.closest('tr[data-sig-index]')?.style.display !== 'none');
+    allCbs.forEach(cb => { cb.checked = checked; });
+    updateDeleteSelectedButton();
+}
+
+function syncSelectAllCheckbox() {
+    const header = document.getElementById("select-all-cb");
+    if (!header) return;
+    const allCbs = [...document.querySelectorAll('#matrix-tbody input.sig-row-cb')]
+        .filter(cb => cb.closest('tr[data-sig-index]')?.style.display !== 'none');
+    header.checked = allCbs.length > 0 && allCbs.every(cb => cb.checked);
+    header.indeterminate = !header.checked && allCbs.some(cb => cb.checked);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     const tbody = document.getElementById("matrix-tbody");
     if (!tbody) return;
     tbody.addEventListener("change", (e) => {
         if (e.target && e.target.classList && e.target.classList.contains("sig-row-cb")) {
             updateDeleteSelectedButton();
+            syncSelectAllCheckbox();
         }
     });
     updateDeleteSelectedButton();
@@ -492,7 +509,7 @@ function renderMatrixHeader() {
     `;
 
     thead.innerHTML = `<tr>
-        <th class="col-select"></th>
+        <th class="col-select"><input type="checkbox" id="select-all-cb" title="Select all" onchange="toggleSelectAll(this.checked)"></th>
         <th class="col-signer-type"></th>
         <th class="col-name">Signer</th>
         <th class="col-entity">Entity</th>

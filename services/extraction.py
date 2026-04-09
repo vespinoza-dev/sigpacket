@@ -88,6 +88,90 @@ Type 3: {{"signing_entity": "Fund LP", "additional_signing_entity": "Fund GP LLC
 Type 4: {{"signing_entity": "Fund LP", "additional_signing_entity": "Fund GP LP", "additional_signing_entity_title": "General Partner", "additional_signing_entity_2": "Fund GP LLC", "additional_signing_entity_title_2": "General Partner", "signer_name": "Jane Smith", "title": "Partner"}}"""
 
 
+# ---------------------------------------------------------------------------
+# Bulk extraction prompt (returns an array of signers)
+# ---------------------------------------------------------------------------
+
+BULK_EXTRACT_PROMPT = """You are extracting ALL signature blocks from a section of a legal document.
+The text may contain one or more signatories. Extract every signer you find.
+
+For each signer, classify the type and extract fields:
+
+Signer Types:
+Type 1 — Individual (natural person, no company)
+Type 2 — Entity, direct signer (company + person)
+Type 3 — Entity → one intermediary → signer
+Type 4 — Entity → two intermediaries → signer
+Type 5 — Entity → three intermediaries → signer
+
+Fields per signer (only include fields you are confident about):
+- signing_entity: Primary company/organization name
+- additional_signing_entity: First intermediary entity name
+- additional_signing_entity_title: First intermediary's role (e.g. "General Partner")
+- additional_signing_entity_2: Second intermediary entity name
+- additional_signing_entity_title_2: Second intermediary's role
+- additional_signing_entity_3: Third intermediary entity name
+- additional_signing_entity_title_3: Third intermediary's role
+- signer_name: Full name of the individual signing
+- title: The individual's title/role (e.g. "CEO", "Managing Partner")
+- email: Email address
+- cc_email: CC or secondary email
+- phone: Phone number
+- address: Street address
+- city_state_zip: City, state, and ZIP (e.g. "San Francisco, CA 94105")
+
+How to identify intermediaries: "By: [Entity], its [Role]" patterns. Each "By:" before
+the signature line is an intermediary. The last person listed under Name: is the signer.
+
+Return a JSON array of signer objects. If no signers found, return [].
+Return ONLY valid JSON — no markdown, no explanation.
+
+Document text:
+---
+{block_text}
+---
+
+Examples:
+[
+  {{"signing_entity": "Fund LP", "additional_signing_entity": "Fund GP LLC", "additional_signing_entity_title": "General Partner", "signer_name": "Jane Smith", "title": "Managing Partner"}},
+  {{"signer_name": "John Doe"}}
+]"""
+
+
+def extract_multiple_fields(block_text):
+    """Extract all signers from a block of text using AI.
+
+    Returns a list of dicts (one per signer). Falls back to [] on failure.
+    """
+    key = os.environ.get("AZURE_OPENAI_API_KEY")
+    if not key:
+        return []
+
+    try:
+        endpoint = os.environ.get("AZURE_OPENAI_BASE_URL")
+        client = OpenAI(base_url=endpoint, api_key=key)
+        completion = client.chat.completions.create(
+            model="gpt-5.4",
+            messages=[{
+                "role": "user",
+                "content": BULK_EXTRACT_PROMPT.format(block_text=block_text)
+            }],
+        )
+        raw = completion.choices[0].message.content.strip()
+        if raw.startswith("```"):
+            raw = re.sub(r'^```(?:json)?\s*', '', raw)
+            raw = re.sub(r'\s*```$', '', raw)
+        result = json.loads(raw)
+        if isinstance(result, list):
+            return result
+        if isinstance(result, dict):
+            return [result]
+        return []
+    except Exception as e:
+        logger.error(f"AI bulk extraction error: {e}")
+        return []
+
+
 # # ---------------------------------------------------------------------------
 # # Claude CLI discovery (fallback)
 # # ---------------------------------------------------------------------------

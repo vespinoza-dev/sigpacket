@@ -1656,10 +1656,36 @@ textarea.editable-field-input {
     font-size: 12px;
     table-layout: fixed;
 }
+.matrix-table col.col-select { width: 32px; }
 .matrix-table col.col-signer-type { width: 3%; }
 .matrix-table col.col-name { width: 15%; }
 .matrix-table col.col-entity { width: 19%; }
 .matrix-table col.col-title { width: 13%; }
+
+/* Select-all header + row checkboxes */
+.matrix-table th.col-select,
+.matrix-table td.col-select {
+    width: 32px;
+    min-width: 32px;
+    text-align: center;
+    vertical-align: middle;
+    padding: 0;
+    position: sticky;
+    left: 0;
+    z-index: 12;
+    background: inherit;
+}
+.matrix-table thead th.col-select {
+    background: var(--table-header);
+    z-index: 14;
+}
+.matrix-table th.col-select input[type="checkbox"],
+.matrix-table td.col-select input[type="checkbox"] {
+    display: block;
+    margin: 0 auto;
+    cursor: pointer;
+    accent-color: var(--primary, #e8a020);
+}
 .matrix-table col.col-actions { width: 10%; }
 /* Left side cells: allow text to wrap/ellipsis */
 .matrix-table td.col-name,

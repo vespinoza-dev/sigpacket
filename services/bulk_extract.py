@@ -5,36 +5,108 @@ and add them to the signature log.
 
 Distinguishes between entity signers (with signing_entity, possible
 additional_signing_entity and role) and individual signers (name only, no title).
+
+Extraction priority:
+  1. Azure OpenAI API (via extract_fields) — preferred, more accurate
+  2. Heuristic parser (parse_signature_block) — fallback if AI is unavailable or fails
 """
 
 import dataclasses
+import logging
 import re
 from docx import Document
+
+logger = logging.getLogger(__name__)
+
+
+def _block_to_text(block_paragraphs):
+    """Convert block paragraphs to plain text string for AI extraction."""
+    return "\n".join(p.text.strip() for p in block_paragraphs if p.text.strip())
+
+
+def _normalize_ai_result(ai_result):
+    """Normalize AI extraction output to the same format as the heuristic parser.
+
+    AI returns: signing_entity, signer_name, title, additional_signing_entity, ...
+    Heuristic returns: entity_name, signer_name, title, signer_type, ...
+    """
+    if not ai_result:
+        return None
+    entity = ai_result.get("signing_entity", "")
+    signer_type = "entity" if entity else "individual"
+    normalized = {
+        "signer_type": signer_type,
+        "entity_name": entity,
+        "signer_name": ai_result.get("signer_name", ""),
+        "title": ai_result.get("title", ""),
+        "additional_signing_entity": ai_result.get("additional_signing_entity", ""),
+        "additional_signing_entity_title": ai_result.get("additional_signing_entity_title", ""),
+        "additional_signing_entity_2": ai_result.get("additional_signing_entity_2", ""),
+        "additional_signing_entity_title_2": ai_result.get("additional_signing_entity_title_2", ""),
+        "additional_signing_entity_3": ai_result.get("additional_signing_entity_3", ""),
+        "additional_signing_entity_title_3": ai_result.get("additional_signing_entity_title_3", ""),
+        "email": ai_result.get("email", ""),
+        "phone": ai_result.get("phone", ""),
+        "cc_email": ai_result.get("cc_email", ""),
+        "address": ai_result.get("address", ""),
+        "city_state_zip": ai_result.get("city_state_zip", ""),
+    }
+    return normalized
 
 
 def extract_signatories_from_docx(file_path):
     """Extract all signature blocks from a .docx file.
 
+    For each block, tries AI extraction first (Azure OpenAI via extract_fields).
+    Falls back to the heuristic parser if AI is unavailable or returns empty.
+
     Returns a list of dicts, each with:
         entity_name, signer_name, title, additional_signing_entity,
-        additional_signing_entity_title
+        additional_signing_entity_title, (and contact fields)
     """
     try:
         doc = Document(file_path)
     except Exception as e:
         raise ValueError(f"Failed to read .docx file '{file_path}': {e}") from e
 
-    paragraphs = doc.paragraphs
+    # Import here to avoid circular imports at module load time
+    try:
+        from services.extraction import extract_multiple_fields
+        ai_available = True
+    except ImportError:
+        ai_available = False
+        logger.warning("extraction module not available; using heuristic only")
 
+    paragraphs = doc.paragraphs
     blocks = split_into_blocks(paragraphs)
 
     signatories = []
     for block in blocks:
-        extracted = parse_signature_block(block)
-        if extracted:
-            for sig in extracted:
-                if sig.get("signer_name") or sig.get("entity_name"):
-                    signatories.append(sig)
+        sig_added = False
+
+        # --- Try AI extraction first (returns a list — handles multiple signers per block) ---
+        if ai_available:
+            block_text = _block_to_text(block)
+            if block_text:
+                try:
+                    ai_results = extract_multiple_fields(block_text)
+                    valid = [
+                        _normalize_ai_result(r) for r in ai_results
+                        if r and (r.get("signer_name") or r.get("signing_entity"))
+                    ]
+                    if valid:
+                        signatories.extend(valid)
+                        sig_added = True
+                except Exception as e:
+                    logger.warning(f"AI extraction failed for block, falling back to heuristic: {e}")
+
+        # --- Fallback to heuristic parser ---
+        if not sig_added:
+            extracted = parse_signature_block(block)
+            if extracted:
+                for sig in extracted:
+                    if sig.get("signer_name") or sig.get("entity_name"):
+                        signatories.append(sig)
 
     return signatories
 
