@@ -124,7 +124,7 @@
       "type": "field",
       "label": "Email",
       "enabled": false,
-      "order": 11,
+      "order": 13,
       "bold": false,
       "italic": false,
       "column": "right"
@@ -134,7 +134,7 @@
       "type": "field",
       "label": "Phone",
       "enabled": false,
-      "order": 12,
+      "order": 15,
       "bold": false,
       "italic": false,
       "column": "right"
@@ -144,7 +144,7 @@
       "type": "field",
       "label": "CC Email",
       "enabled": false,
-      "order": 13,
+      "order": 14,
       "bold": false,
       "italic": false,
       "column": "right"
@@ -154,7 +154,7 @@
       "type": "field",
       "label": "Address",
       "enabled": false,
-      "order": 14,
+      "order": 11,
       "bold": false,
       "italic": false,
       "column": "right"
@@ -164,7 +164,17 @@
       "type": "field",
       "label": "City/State/ZIP",
       "enabled": false,
-      "order": 15,
+      "order": 12,
+      "bold": false,
+      "italic": false,
+      "column": "right"
+    },
+    {
+      "id": "signer_description",
+      "type": "field",
+      "label": "Textbox",
+      "enabled": true,
+      "order": 4.5,
       "bold": false,
       "italic": false,
       "column": "right"

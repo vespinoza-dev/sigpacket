@@ -51,7 +51,7 @@ EXCEL_COLUMNS = ["Client", "Signer Type", "Signer Name", "Title", "Signing Entit
                  "Additional Signing Entity 2", "Additional Entity Role 2",
                  "Additional Signing Entity 3", "Additional Entity Role 3",
                  "Email", "Phone", "CC Email",
-                 "Address", "City State ZIP", "Field Overrides"]
+                 "Address", "City State ZIP", "Signer Description", "Field Overrides"]
 
 # ---------------------------------------------------------------------------
 # Data functions
@@ -81,7 +81,7 @@ def ensure_excel():
         cell.border = thin_border
 
     # Set column widths
-    widths = [20, 14, 22, 28, 28, 28, 28, 28, 28, 28, 28, 28, 18, 28, 28, 28, 40]
+    widths = [20, 14, 22, 28, 28, 28, 28, 28, 28, 28, 28, 28, 18, 28, 28, 28, 40, 40]
     for i, w in enumerate(widths, 1):
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
 
@@ -129,7 +129,8 @@ def get_all_signatures():
                 "cc_email": (row[13] or "") if len(row) > 13 else "",
                 "address": (row[14] or "") if len(row) > 14 else "",
                 "city_state_zip": (row[15] or "") if len(row) > 15 else "",
-                "field_overrides": json.loads(row[16]) if len(row) > 16 and row[16] else {},
+                "signer_description": (row[16] or "") if len(row) > 16 else "",
+                "field_overrides": json.loads(row[17]) if len(row) > 17 and row[17] else {},
             })
     return rows
 
@@ -160,13 +161,14 @@ def update_signature_row(index, client, fields):
         "cc_email": 14,
         "address": 15,
         "city_state_zip": 16,
+        "signer_description": 17,
     }
     for key, col in col_map.items():
         if key in fields:
             ws.cell(row=row_num, column=col, value=fields[key])
     # Handle field_overrides separately (JSON serialization)
     if "field_overrides" in fields:
-        ws.cell(row=row_num, column=17, value=json.dumps(fields["field_overrides"]) if fields["field_overrides"] else "")
+        ws.cell(row=row_num, column=18, value=json.dumps(fields["field_overrides"]) if fields["field_overrides"] else "")
     _safe_save(wb)
     return True
 
@@ -210,6 +212,7 @@ def _build_signature_row(client, fields):
         fields.get("cc_email", ""),
         fields.get("address", ""),
         fields.get("city_state_zip", ""),
+        fields.get("signer_description", ""),
         json.dumps(fields.get("field_overrides", {})) if fields.get("field_overrides") else "",
     ]
 
@@ -235,6 +238,7 @@ def _snapshot_signature_entries():
                 "cc_email": row.get("cc_email", ""),
                 "address": row.get("address", ""),
                 "city_state_zip": row.get("city_state_zip", ""),
+                "signer_description": row.get("signer_description", ""),
                 "field_overrides": row.get("field_overrides", {}),
             },
         }
@@ -329,6 +333,7 @@ def upload_signatures():
         "CC Email": "cc_email",
         "Address": "address",
         "City State ZIP": "city_state_zip",
+        "Signer Description": "signer_description",
     }
 
     try:
@@ -450,7 +455,7 @@ def download_signatures():
             else:
                 signer_names.append(row_data[4] or row_data[2] or "")  # Signing Entity, fallback to Signer Name
 
-        sig_widths = [20, 14, 22, 28, 28, 28, 28, 28, 28, 28, 28, 28, 18, 28, 28, 28]
+        sig_widths = [20, 14, 22, 28, 28, 28, 28, 28, 28, 28, 28, 28, 18, 28, 28, 28, 40]
         for i, w in enumerate(sig_widths, 1):
             if i <= num_sig_cols:
                 ws1.column_dimensions[ws1.cell(row=1, column=i).column_letter].width = w

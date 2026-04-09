@@ -121,7 +121,7 @@
       "id": "email",
       "italic": false,
       "label": "Email Address",
-      "order": 10,
+      "order": 12,
       "type": "field"
     },
     {
@@ -131,7 +131,7 @@
       "id": "phone",
       "italic": false,
       "label": "Phone Number",
-      "order": 11,
+      "order": 14,
       "type": "field"
     },
     {
@@ -141,7 +141,7 @@
       "id": "cc_email",
       "italic": false,
       "label": "CC Email Address",
-      "order": 12,
+      "order": 13,
       "type": "field"
     },
     {
@@ -151,7 +151,7 @@
       "id": "address",
       "italic": false,
       "label": "Mailing Address",
-      "order": 13,
+      "order": 10,
       "type": "field"
     },
     {
@@ -161,8 +161,18 @@
       "id": "city_state_zip",
       "italic": false,
       "label": "City/State/ZIP",
-      "order": 14,
+      "order": 11,
       "type": "field"
+    },
+    {
+      "id": "signer_description",
+      "type": "field",
+      "label": "Textbox",
+      "enabled": true,
+      "order": 3.5,
+      "bold": false,
+      "italic": false,
+      "column": "right"
     }
   ],
   "footer_template": "Signature Page to Action by Unanimous Written Consent of the Board of Directors of {{company_name}}",

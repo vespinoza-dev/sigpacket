@@ -151,6 +151,8 @@ def _get_field_text(field, ctx):
         return "Date: _________________"
     elif fid == "entity_name":
         return entity if (entity and not is_individual) else ""
+    elif fid == "signer_description":
+        return sig.get("signer_description", "").strip() if not is_individual else ""
     elif fid == "entity_header":
         return ctx["config"].get("entity_header_label", "")
     elif fid == "company_header":
@@ -325,6 +327,18 @@ def _build_entity_name(doc, field, ctx):
     _set_run_font(r, bold=True)
 
 
+def _build_signer_description(doc, field, ctx):
+    """Emit the free-form signing capacity / nominee language line below the entity name."""
+    if ctx["is_individual"]:
+        return
+    value = ctx["sig_block"].get("signer_description", "").strip()
+    if not value:
+        return
+    p = _add_field_paragraph(doc, ctx, space_after=0)
+    r = p.add_run(value)
+    _set_run_font(r)
+
+
 def _build_additional_entity(doc, field, ctx, suffix=""):
     """Emit one additional signing entity pair (entity line + role line).
 
@@ -497,6 +511,7 @@ _FIELD_BUILDERS = {
     "salutation": _build_salutation,
     "date_line": _build_date_line,
     "entity_name": _build_entity_name,
+    "signer_description": _build_signer_description,
     "additional_signing_entity": _build_additional_signing_entity,
     "additional_signing_entity_2": _build_additional_signing_entity_2,
     "additional_signing_entity_3": _build_additional_signing_entity_3,
@@ -603,6 +618,8 @@ def build_page(page_type, sig_block, company_name=None, field_overrides=None, fi
         if fid.startswith("additional_signing_entity"):
             suffix = "" if fid == "additional_signing_entity" else fid.replace("additional_signing_entity", "")
             return bool(sig_block.get(f"additional_signing_entity{suffix}", "").strip())
+        if fid == "signer_description":
+            return bool(sig_block.get("signer_description", "").strip())
         return True
     grid_fields = [f for f in enabled_fields if f.get("id") not in _FULL_WIDTH_IDS and _has_content(f)]
 

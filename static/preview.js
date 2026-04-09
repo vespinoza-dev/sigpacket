@@ -119,7 +119,7 @@ const STANDARD_SIG_FIELDS = ['section_header','date_line','entity_name','additio
 
 const DEFAULT_FIELD_ORDER = {
     // Main Documents
-    stock_purchase_agreement: ['witness_clause', ...STANDARD_SIG_FIELDS, 'email','address','city_state_zip'],
+    stock_purchase_agreement: ['witness_clause', ...STANDARD_SIG_FIELDS, 'address','city_state_zip','email','cc_email','phone'],
     certificate_of_incorporation: ['witness_clause', ...STANDARD_SIG_FIELDS],
     investors_rights_agreement: ['witness_clause', ...STANDARD_SIG_FIELDS],
     voting_agreement: ['witness_clause', ...STANDARD_SIG_FIELDS],

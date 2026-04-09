@@ -1,175 +1,187 @@
 {
-  "page_type": "stock_purchase_agreement",
-  "display_name": "Stock Purchase Agreement",
   "agreement_title": "Preferred Stock Purchase Agreement",
-  "default_title": "Chief Executive Officer",
-  "witness_clause_text": "IN WITNESS WHEREOF, the parties have executed this Series {{financing_round}} {{agreement_name}} as of the date first written above.",
-  "entity_header_label": "PURCHASER:",
-  "section_header_label": "PURCHASER:",
   "consent_text": "",
-  "separate_its_line": true,
-  "show_by_prefix_individual": false,
+  "default_title": "Chief Executive Officer",
+  "display_name": "Stock Purchase Agreement",
+  "entity_header_label": "PURCHASER:",
   "fields": [
     {
+      "bold": false,
+      "column": "right",
+      "enabled": true,
       "id": "witness_clause",
-      "type": "text",
+      "italic": false,
       "label": "Execution / Witness Clause",
-      "enabled": true,
       "order": 0,
-      "bold": false,
-      "italic": false,
-      "column": "right"
+      "type": "text"
     },
     {
+      "bold": true,
+      "column": "left",
+      "enabled": false,
       "id": "company_header",
-      "type": "field",
+      "italic": false,
       "label": "\"Company:\" Header Label",
-      "enabled": false,
       "order": 1,
-      "bold": true,
-      "italic": false,
-      "column": "left"
+      "type": "field"
     },
     {
+      "bold": true,
+      "column": "left",
+      "enabled": true,
       "id": "section_header",
-      "type": "field",
+      "italic": false,
       "label": "Signer Role Label",
-      "enabled": true,
       "order": 2,
-      "bold": true,
-      "italic": false,
-      "column": "left"
+      "type": "field"
     },
     {
+      "bold": false,
+      "column": "left",
+      "enabled": false,
       "id": "date_line",
-      "type": "field",
+      "italic": false,
       "label": "Date Field",
-      "enabled": false,
       "order": 3,
-      "bold": false,
-      "italic": false,
-      "column": "left"
+      "type": "field"
     },
     {
-      "id": "entity_name",
-      "type": "field",
-      "label": "Signing Entity Name",
-      "enabled": true,
-      "order": 3,
       "bold": true,
+      "column": "right",
+      "enabled": true,
+      "id": "entity_name",
       "italic": false,
-      "column": "right"
+      "label": "Signing Entity Name",
+      "order": 3,
+      "type": "field"
     },
     {
+      "bold": false,
+      "column": "right",
+      "enabled": true,
       "id": "additional_signing_entity",
-      "type": "field",
+      "italic": false,
       "label": "Intermediary Entity 1",
-      "enabled": true,
       "order": 4,
-      "bold": false,
-      "italic": false,
-      "column": "right"
+      "type": "field"
     },
     {
+      "bold": false,
+      "column": "right",
+      "enabled": true,
       "id": "additional_signing_entity_2",
-      "type": "field",
+      "italic": false,
       "label": "Intermediary Entity 2",
-      "enabled": true,
       "order": 5,
-      "bold": false,
-      "italic": false,
-      "column": "right"
+      "type": "field"
     },
     {
+      "bold": false,
+      "column": "right",
+      "enabled": true,
       "id": "additional_signing_entity_3",
-      "type": "field",
+      "italic": false,
       "label": "Intermediary Entity 3",
-      "enabled": true,
       "order": 6,
-      "bold": false,
-      "italic": false,
-      "column": "right"
+      "type": "field"
     },
     {
+      "bold": false,
+      "column": "right",
+      "enabled": true,
       "id": "by_line",
-      "type": "signature",
+      "italic": false,
       "label": "Signature / \"By:\" Line",
-      "enabled": true,
       "order": 7,
-      "bold": false,
-      "italic": false,
-      "column": "right"
+      "type": "signature"
     },
     {
+      "bold": false,
+      "column": "right",
+      "enabled": true,
       "id": "signer_name",
-      "type": "field",
+      "italic": false,
       "label": "Signer Name Line",
-      "enabled": true,
       "order": 8,
-      "bold": false,
-      "italic": false,
-      "column": "right"
+      "type": "field"
     },
     {
-      "id": "title",
-      "type": "field",
-      "label": "Title Line",
+      "bold": false,
+      "column": "right",
       "enabled": true,
+      "id": "title",
+      "italic": false,
+      "label": "Title Line",
       "order": 9,
-      "bold": false,
-      "italic": false,
-      "column": "right"
+      "type": "field"
     },
     {
+      "bold": false,
+      "column": "right",
+      "enabled": false,
       "id": "email",
-      "type": "field",
+      "italic": false,
       "label": "Email Address",
-      "enabled": false,
-      "order": 10,
-      "bold": false,
-      "italic": false,
-      "column": "right"
-    },
-    {
-      "id": "phone",
-      "type": "field",
-      "label": "Phone Number",
-      "enabled": false,
-      "order": 11,
-      "bold": false,
-      "italic": false,
-      "column": "right"
-    },
-    {
-      "id": "cc_email",
-      "type": "field",
-      "label": "CC Email Address",
-      "enabled": false,
       "order": 12,
-      "bold": false,
-      "italic": false,
-      "column": "right"
+      "type": "field"
     },
     {
-      "id": "address",
-      "type": "field",
-      "label": "Mailing Address",
-      "enabled": false,
-      "order": 13,
       "bold": false,
-      "italic": false,
-      "column": "right"
-    },
-    {
-      "id": "city_state_zip",
-      "type": "field",
-      "label": "City/State/ZIP",
+      "column": "right",
       "enabled": false,
+      "id": "phone",
+      "italic": false,
+      "label": "Phone Number",
       "order": 14,
+      "type": "field"
+    },
+    {
+      "bold": false,
+      "column": "right",
+      "enabled": false,
+      "id": "cc_email",
+      "italic": false,
+      "label": "CC Email Address",
+      "order": 13,
+      "type": "field"
+    },
+    {
+      "bold": false,
+      "column": "right",
+      "enabled": true,
+      "id": "address",
+      "italic": false,
+      "label": "Mailing Address",
+      "order": 10,
+      "type": "field"
+    },
+    {
+      "bold": false,
+      "column": "right",
+      "enabled": true,
+      "id": "city_state_zip",
+      "italic": false,
+      "label": "City/State/ZIP",
+      "order": 11,
+      "type": "field"
+    },
+    {
+      "id": "signer_description",
+      "type": "field",
+      "label": "Textbox",
+      "enabled": true,
+      "order": 3.5,
       "bold": false,
       "italic": false,
       "column": "right"
     }
   ],
-  "footer_template": "Signature Page to {{agreement_name}} of {{company_name}}"
+  "footer_template": "Signature Page to {{agreement_name}} of {{company_name}}",
+  "page_type": "stock_purchase_agreement",
+  "section_header_label": "PURCHASER:",
+  "separate_its_line": true,
+  "show_by_prefix_individual": false,
+  "witness_clause_text": "IN WITNESS WHEREOF, the parties have executed this Series {{financing_round}} {{agreement_name}} as of the date first written above.",
+  "related_documents": [],
+  "footer_enabled": true
 }
