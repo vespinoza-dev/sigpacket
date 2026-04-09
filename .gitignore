@@ -1,5 +1,6 @@
 .env
 .DS_Store
+services/signatures.xlsx
 __pycache__/
 *.pyc
 tests/
