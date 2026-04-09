@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signature Packet Generator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,300;0,400;0,600;0,700;0,900;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="header">
+    <div class="header-brand">
+        <img src="/static/goodwin-hex-g.png" alt="Goodwin" class="header-logo">
+        <span class="goodwin-wordmark">GOODWIN</span>
+        <span class="header-brand-pipe"></span>
+        <h1>Signature Packet Generator</h1>
+    </div>
+    <div class="header-controls">
+        <input type="hidden" id="api-key" value="">
+        <div class="generate-dropdown" id="generate-dropdown">
+            <button class="btn btn-primary generate-btn" id="generate-btn" onclick="toggleGenerateMenu()">Generate & Download &#9662;</button>
+            <div class="generate-menu" id="generate-menu">
+                <button onclick="submitGenerate('by_entity')">By Entity / Individual</button>
+                <button onclick="submitGenerate('by_document')">By Document Type</button>
+                <button onclick="submitGenerate('all_in_one')">All in One File</button>
+            </div>
+        </div>
+    </div>
+</header>
+
+<div class="container">
+    <div class="project-strip">
+        <label class="project-strip-label" for="company-name">Company</label>
+        <input type="text" id="company-name" placeholder="Company Name" value="">
+        <label class="project-strip-label" for="financing-round">Round</label>
+        <input type="text" id="financing-round" placeholder="e.g. A, Seed">
+    </div>
+    <div class="input-panel">
+        <div class="info-section">
+            <h2>Add Signatory</h2>
+            <div class="signer-type-toggle">
+                <button type="button" class="type-btn active" data-type="entity" onclick="setSignerType('entity')">Entity</button>
+                <button type="button" class="type-btn" data-type="individual" onclick="setSignerType('individual')">Individual</button>
+                <input type="hidden" id="signer-type" value="entity">
+            </div>
+            <div class="form-row entity-fields entity-row">
+                <div class="form-group">
+                    <label for="signing-entity">Signing Entity</label>
+                    <input type="text" id="signing-entity" placeholder="Signing Entity">
+                </div>
+                <div id="add-entity-link-wrap">
+                    <button type="button" class="btn-add-entity" id="add-entity-btn" onclick="addSigningEntity()">+ Add Signing Entity</button>
+                </div>
+                <div class="additional-entity-pair" id="additional-entity-1" style="display:none;">
+                    <button type="button" class="btn-remove-entity" onclick="removeSigningEntity(1)" title="Remove">&minus;</button>
+                    <div class="form-group">
+                        <label for="additional-signing-entity">Additional Entity 1</label>
+                        <input type="text" id="additional-signing-entity" placeholder="">
+                    </div>
+                    <div class="form-group">
+                        <label for="additional-signing-entity-title">Role</label>
+                        <input type="text" id="additional-signing-entity-title" placeholder="e.g., general partner">
+                    </div>
+                </div>
+                <div class="additional-entity-pair" id="additional-entity-2" style="display:none;">
+                    <button type="button" class="btn-remove-entity" onclick="removeSigningEntity(2)" title="Remove">&minus;</button>
+                    <div class="form-group">
+                        <label for="additional-signing-entity-2">Additional Entity 2</label>
+                        <input type="text" id="additional-signing-entity-2" placeholder="">
+                    </div>
+                    <div class="form-group">
+                        <label for="additional-signing-entity-title-2">Role</label>
+                        <input type="text" id="additional-signing-entity-title-2" placeholder="">
+                    </div>
+                </div>
+                <div class="additional-entity-pair" id="additional-entity-3" style="display:none;">
+                    <button type="button" class="btn-remove-entity" onclick="removeSigningEntity(3)" title="Remove">&minus;</button>
+                    <div class="form-group">
+                        <label for="additional-signing-entity-3">Additional Entity 3</label>
+                        <input type="text" id="additional-signing-entity-3" placeholder="">
+                    </div>
+                    <div class="form-group">
+                        <label for="additional-signing-entity-title-3">Role</label>
+                        <input type="text" id="additional-signing-entity-title-3" placeholder="">
+                    </div>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="signer-name">Signer Name</label>
+                    <input type="text" id="signer-name" placeholder="Signer Name">
+                </div>
+                <div class="form-group entity-fields">
+                    <label for="signer-title">Title</label>
+                    <input type="text" id="signer-title" placeholder="Title">
+                </div>
+            </div>
+
+            <!-- Contact Details -->
+            <div class="section-divider">Contact Details</div>
+            <div class="form-row contact-row-3col">
+                <div class="form-group contact-col">
+                    <input type="text" id="signer-email" placeholder="Email">
+                    <input type="text" id="cc-email" placeholder="CC Email">
+                </div>
+                <div class="form-group contact-col">
+                    <input type="text" id="signer-address" placeholder="Street Address">
+                    <input type="text" id="signer-city-state" placeholder="City, State ZIP">
+                </div>
+                <div class="form-group contact-col">
+                    <input type="text" id="signer-phone" placeholder="Phone">
+                    <div class="form-row-save-bar">
+                        <button class="btn btn-primary save-sig-btn" id="save-sig-btn" onclick="submitSaveSignature()">Save Signatory</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upload areas -->
+            <div class="form-row upload-row-side-by-side">
+                <div class="form-group upload-group">
+                    <label>Screenshot</label>
+                    <div class="upload-area" id="upload-area" onclick="document.getElementById('sig-file-input').click()">
+                        <input type="file" id="sig-file-input" accept="image/*" hidden>
+                        <div class="upload-placeholder" id="upload-placeholder">
+                            <span class="upload-placeholder-main">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                                Drop a signature block screenshot here
+                            </span>
+                            <span class="upload-hint">PNG or JPG image — auto-reads signer name, entity, and title</span>
+                        </div>
+                        <div class="upload-preview" id="upload-preview" style="display:none;">
+                            <img id="sig-preview-img" alt="Preview">
+                            <button type="button" class="btn-remove-sig" onclick="removeScreenshot(event)">&times;</button>
+                        </div>
+                    </div>
+                    <div class="extract-status" id="extract-status" style="display:none;"></div>
+                </div>
+                <div class="form-group upload-group">
+                    <label>Bulk Import</label>
+                    <div class="bulk-upload-area" id="bulk-upload-area" onclick="document.getElementById('bulk-file-input').click()">
+                        <input type="file" id="bulk-file-input" accept=".docx" hidden onchange="submitBulkExtract(this.files[0])">
+                        <span class="upload-placeholder-main">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                            Drop a .docx with signature pages
+                        </span>
+                        <span class="upload-hint">Extracts all signatories from the document at once</span>
+                    </div>
+                    <div class="bulk-status" id="bulk-status" style="display:none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Preview Panel -->
+<div class="preview-section" id="preview-section">
+    <div class="preview-header">
+        <h2>Live Preview</h2>
+        <button class="btn btn-outline btn-sm preview-toggle-btn" id="preview-toggle-btn" onclick="togglePreview()">Hide Preview</button>
+        <button class="drawer-toggle-btn" id="drawer-toggle-btn" onclick="toggleSettingsDrawer()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+            Settings
+        </button>
+    </div>
+    <div class="preview-container" id="preview-container">
+        <div class="preview-content" id="preview-content">
+            <div class="preview-placeholder" id="preview-placeholder">
+                Check page types in the matrix below to see a live preview of signature pages.
+            </div>
+            <div class="preview-pages" id="preview-pages"></div>
+        </div>
+        <aside class="settings-drawer" id="settings-drawer">
+            <div class="drawer-header">
+                <h2>Template Settings</h2>
+                <button class="drawer-close-btn" onclick="toggleSettingsDrawer()">&times;</button>
+                <select id="drawer-tab-select" onchange="selectTemplateTab(this.value)"></select>
+                <div class="drawer-scope-toggle" id="drawer-scope-toggle">
+                    <button class="scope-btn active" data-scope="all" onclick="setDrawerScope('all')">All — </button>
+                    <button class="scope-btn" data-scope="selected" onclick="setDrawerScope('selected')" disabled>This Signer's Page</button>
+                </div>
+            </div>
+            <div class="drawer-body">
+                <div class="template-form" id="template-form"></div>
+            </div>
+            <div class="drawer-footer" id="drawer-footer"></div>
+        </aside>
+    </div>
+</div>
+
+<!-- Signature Matrix -->
+<div class="matrix-section">
+    <div class="matrix-header">
+        <h2>Signature Matrix</h2>
+        <div class="matrix-search">
+            <input type="text" id="matrix-search-input" placeholder="Search signers / entities..." oninput="filterMatrixRows(this.value)">
+        </div>
+        <div class="signatures-actions">
+            <button class="btn btn-outline refresh-btn" id="delete-selected-btn" onclick="deleteSelectedSignatures()" disabled>Delete</button>
+            <div class="excel-dropdown" id="excel-dropdown">
+                <button class="btn btn-outline excel-btn" onclick="toggleExcelMenu()"
+                    ondragover="event.preventDefault(); this.classList.add('drag-over')"
+                    ondragleave="this.classList.remove('drag-over')"
+                    ondrop="event.preventDefault(); this.classList.remove('drag-over'); handleExcelDrop(event)">
+                    Excel
+                    <svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="2 4 6 8 10 4"/></svg>
+                </button>
+                <div class="excel-menu" id="excel-menu">
+                    <button onclick="downloadSignaturesExcel(); toggleExcelMenu()">Download Excel</button>
+                    <button onclick="document.getElementById('upload-excel-input').click(); toggleExcelMenu()">Upload Excel</button>
+                </div>
+                <input type="file" id="upload-excel-input" accept=".xlsx" style="display:none" onchange="uploadSignaturesExcel(this)">
+            </div>
+            <div class="doc-manager-dropdown">
+                <button class="btn btn-outline doc-manager-btn" onclick="toggleDocManager()">
+                    Documents
+                </button>
+                <div class="doc-manager-panel" id="doc-manager-panel">
+                    <div class="doc-manager-header">
+                        <span>Add New Document</span>
+                    </div>
+                    <div class="doc-manager-footer">
+                        <button class="doc-manager-add-btn" onclick="addCustomPageType(); toggleDocManager()">Add Manually</button>
+                        <button class="doc-manager-add-btn" onclick="document.getElementById('docx-page-type-input').click(); toggleDocManager()">From .docx</button>
+                    </div>
+                    <div class="doc-manager-header">
+                        <span>Show / Hide Documents</span>
+                    </div>
+                    <div class="doc-manager-list" id="doc-manager-list"></div>
+                </div>
+            </div>
+            <input type="file" id="docx-page-type-input" accept=".docx" hidden onchange="addPageTypeFromDocx(this.files[0])">
+        </div>
+    </div>
+    <div class="matrix-table-wrap">
+        <table class="matrix-table" id="matrix-table">
+            <colgroup id="matrix-colgroup">
+                <!-- Dynamically rendered by renderMatrixHeader() -->
+            </colgroup>
+            <thead>
+                <!-- Dynamically rendered by renderMatrixHeader() -->
+            </thead>
+            <tbody id="matrix-tbody">
+                <tr><td class="empty-row">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Override Confirmation Modal -->
+<div class="override-modal-overlay" id="override-modal-overlay">
+    <div class="override-modal">
+        <div class="override-modal-header">
+            <h3>Overwrite Individual Edits?</h3>
+            <button class="drawer-close-btn" onclick="resolveOverrideModal('none')">&times;</button>
+        </div>
+        <p class="override-modal-desc">The following signatories have individual edits for this page type. Select which to overwrite:</p>
+        <div class="override-modal-list" id="override-modal-list"></div>
+        <div class="override-modal-actions">
+            <button class="template-save-btn" onclick="resolveOverrideModal('all')">Apply to All</button>
+            <button class="template-reset-btn" onclick="resolveOverrideModal('selected')">Apply to Selected</button>
+            <button class="template-reset-btn" onclick="resolveOverrideModal('none')">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Prompt Modal -->
+<div class="override-modal-overlay" id="prompt-modal-overlay">
+    <div class="override-modal">
+        <div class="override-modal-header">
+            <h3 id="prompt-modal-title">Enter Signature Page Name</h3>
+            <button class="drawer-close-btn" onclick="resolvePromptModal(null)">&times;</button>
+        </div>
+        <div style="padding:0 20px 16px">
+            <input type="text" id="prompt-modal-input" class="prompt-modal-input" placeholder="" autofocus>
+        </div>
+        <div class="override-modal-actions">
+            <button class="template-save-btn" onclick="resolvePromptModal(document.getElementById('prompt-modal-input').value)">OK</button>
+            <button class="template-reset-btn" onclick="resolvePromptModal(null)">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/utils.js"></script>
+<script src="/static/signatures.js"></script>
+<script src="/static/preview.js"></script>
+<script src="/static/drawer.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

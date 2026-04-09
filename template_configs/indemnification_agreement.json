@@ -1,0 +1,175 @@
+{
+  "consent_text": "",
+  "default_title": "",
+  "display_name": "Indemnification Agreement",
+  "entity_header_label": "",
+  "fields": [
+    {
+      "bold": false,
+      "column": "right",
+      "enabled": true,
+      "id": "witness_clause",
+      "italic": false,
+      "label": "Witness Clause",
+      "order": 0,
+      "type": "text"
+    },
+    {
+      "bold": true,
+      "column": "left",
+      "enabled": true,
+      "id": "company_header",
+      "italic": false,
+      "label": "Company Header",
+      "order": 1,
+      "type": "field"
+    },
+    {
+      "bold": true,
+      "column": "left",
+      "enabled": true,
+      "id": "section_header",
+      "italic": false,
+      "label": "Section Header",
+      "order": 2,
+      "type": "field"
+    },
+    {
+      "bold": false,
+      "column": "left",
+      "enabled": false,
+      "id": "date_line",
+      "italic": false,
+      "label": "Date Line",
+      "order": 3,
+      "type": "field"
+    },
+    {
+      "bold": true,
+      "column": "right",
+      "enabled": true,
+      "id": "entity_name",
+      "italic": false,
+      "label": "Entity Name",
+      "order": 4,
+      "type": "field"
+    },
+    {
+      "bold": false,
+      "column": "right",
+      "enabled": true,
+      "id": "additional_signing_entity",
+      "italic": false,
+      "label": "Sub-Entity 1",
+      "order": 5,
+      "type": "field"
+    },
+    {
+      "bold": false,
+      "column": "right",
+      "enabled": true,
+      "id": "additional_signing_entity_2",
+      "italic": false,
+      "label": "Sub-Entity 2",
+      "order": 6,
+      "type": "field"
+    },
+    {
+      "bold": false,
+      "column": "right",
+      "enabled": true,
+      "id": "additional_signing_entity_3",
+      "italic": false,
+      "label": "Sub-Entity 3",
+      "order": 7,
+      "type": "field"
+    },
+    {
+      "bold": false,
+      "column": "right",
+      "enabled": true,
+      "id": "by_line",
+      "italic": false,
+      "label": "Signature Line",
+      "order": 8,
+      "type": "signature"
+    },
+    {
+      "bold": false,
+      "column": "right",
+      "enabled": true,
+      "id": "signer_name",
+      "italic": false,
+      "label": "Signer Name",
+      "order": 9,
+      "type": "field"
+    },
+    {
+      "bold": false,
+      "column": "right",
+      "enabled": true,
+      "id": "title",
+      "italic": false,
+      "label": "Title",
+      "order": 10,
+      "type": "field"
+    },
+    {
+      "bold": false,
+      "column": "right",
+      "enabled": false,
+      "id": "email",
+      "italic": false,
+      "label": "Email",
+      "order": 11,
+      "type": "field"
+    },
+    {
+      "bold": false,
+      "column": "right",
+      "enabled": false,
+      "id": "phone",
+      "italic": false,
+      "label": "Phone",
+      "order": 12,
+      "type": "field"
+    },
+    {
+      "bold": false,
+      "column": "right",
+      "enabled": false,
+      "id": "cc_email",
+      "italic": false,
+      "label": "CC Email",
+      "order": 13,
+      "type": "field"
+    },
+    {
+      "bold": false,
+      "column": "right",
+      "enabled": false,
+      "id": "address",
+      "italic": false,
+      "label": "Address",
+      "order": 14,
+      "type": "field"
+    },
+    {
+      "bold": false,
+      "column": "right",
+      "enabled": false,
+      "id": "city_state_zip",
+      "italic": false,
+      "label": "City/State/ZIP",
+      "order": 15,
+      "type": "field"
+    }
+  ],
+  "footer_template": "Signature Page to Indemnification Agreement of {{company_name}}",
+  "page_type": "indemnification_agreement",
+  "section_header_label": "INDEMNITEE:",
+  "separate_its_line": true,
+  "show_by_prefix_individual": false,
+  "witness_clause_text": "IN WITNESS WHEREOF, the parties have executed this {{agreement_name}} as of the date first above written.",
+  "related_documents": []
+}

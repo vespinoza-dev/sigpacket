@@ -1,0 +1,175 @@
+{
+  "page_type": "rofr_cosale",
+  "display_name": "Right of First Refusal and Co-Sale Agreement",
+  "default_title": "",
+  "witness_clause_text": "IN WITNESS WHEREOF, the parties have executed this {{agreement_name}} as of the date first above written.",
+  "entity_header_label": "",
+  "section_header_label": "",
+  "consent_text": "",
+  "separate_its_line": true,
+  "show_by_prefix_individual": false,
+  "fields": [
+    {
+      "id": "witness_clause",
+      "type": "text",
+      "label": "Execution / Witness Clause",
+      "enabled": true,
+      "order": 0,
+      "bold": false,
+      "italic": false,
+      "column": "right"
+    },
+    {
+      "id": "company_header",
+      "type": "field",
+      "label": "\"Company:\" Header Label",
+      "enabled": false,
+      "order": 1,
+      "bold": true,
+      "italic": false,
+      "column": "left"
+    },
+    {
+      "id": "section_header",
+      "type": "field",
+      "label": "Signer Role Label",
+      "enabled": false,
+      "order": 2,
+      "bold": true,
+      "italic": false,
+      "column": "left"
+    },
+    {
+      "id": "date_line",
+      "type": "field",
+      "label": "Date Field",
+      "enabled": false,
+      "order": 3,
+      "bold": false,
+      "italic": false,
+      "column": "left"
+    },
+    {
+      "id": "entity_name",
+      "type": "field",
+      "label": "Signing Entity Name",
+      "enabled": true,
+      "order": 3,
+      "bold": true,
+      "italic": false,
+      "column": "right"
+    },
+    {
+      "id": "additional_signing_entity",
+      "type": "field",
+      "label": "Intermediary Entity 1",
+      "enabled": true,
+      "order": 4,
+      "bold": false,
+      "italic": false,
+      "column": "right"
+    },
+    {
+      "id": "additional_signing_entity_2",
+      "type": "field",
+      "label": "Intermediary Entity 2",
+      "enabled": true,
+      "order": 5,
+      "bold": false,
+      "italic": false,
+      "column": "right"
+    },
+    {
+      "id": "additional_signing_entity_3",
+      "type": "field",
+      "label": "Intermediary Entity 3",
+      "enabled": true,
+      "order": 6,
+      "bold": false,
+      "italic": false,
+      "column": "right"
+    },
+    {
+      "id": "by_line",
+      "type": "signature",
+      "label": "Signature / \"By:\" Line",
+      "enabled": true,
+      "order": 7,
+      "bold": false,
+      "italic": false,
+      "column": "right"
+    },
+    {
+      "id": "signer_name",
+      "type": "field",
+      "label": "Signer Name Line",
+      "enabled": true,
+      "order": 8,
+      "bold": false,
+      "italic": false,
+      "column": "right"
+    },
+    {
+      "id": "title",
+      "type": "field",
+      "label": "Title Line",
+      "enabled": true,
+      "order": 9,
+      "bold": false,
+      "italic": false,
+      "column": "right"
+    },
+    {
+      "id": "email",
+      "type": "field",
+      "label": "Email Address",
+      "enabled": false,
+      "order": 10,
+      "bold": false,
+      "italic": false,
+      "column": "right"
+    },
+    {
+      "id": "phone",
+      "type": "field",
+      "label": "Phone Number",
+      "enabled": false,
+      "order": 11,
+      "bold": false,
+      "italic": false,
+      "column": "right"
+    },
+    {
+      "id": "cc_email",
+      "type": "field",
+      "label": "CC Email Address",
+      "enabled": false,
+      "order": 12,
+      "bold": false,
+      "italic": false,
+      "column": "right"
+    },
+    {
+      "id": "address",
+      "type": "field",
+      "label": "Mailing Address",
+      "enabled": false,
+      "order": 13,
+      "bold": false,
+      "italic": false,
+      "column": "right"
+    },
+    {
+      "id": "city_state_zip",
+      "type": "field",
+      "label": "City/State/ZIP",
+      "enabled": false,
+      "order": 14,
+      "bold": false,
+      "italic": false,
+      "column": "right"
+    }
+  ],
+  "footer_template": "Signature Page to Right of First Refusal and Co-Sale Agreement of {{company_name}}",
+  "related_documents": []
+}
