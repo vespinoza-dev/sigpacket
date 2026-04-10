@@ -23,6 +23,28 @@ document.addEventListener("DOMContentLoaded", () => {
         area.classList.remove("drag-over");
         if (e.dataTransfer.files.length > 0) handleScreenshotUpload(e.dataTransfer.files[0]);
     });
+
+    // Bulk extract — drag-and-drop for .docx and .pdf
+    const bulkArea = document.getElementById("bulk-upload-area");
+    if (bulkArea) {
+        bulkArea.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            bulkArea.classList.add("drag-over");
+        });
+        bulkArea.addEventListener("dragleave", () => bulkArea.classList.remove("drag-over"));
+        bulkArea.addEventListener("drop", (e) => {
+            e.preventDefault();
+            bulkArea.classList.remove("drag-over");
+            const file = e.dataTransfer.files[0];
+            if (!file) return;
+            const name = file.name.toLowerCase();
+            if (!name.endsWith(".docx") && !name.endsWith(".pdf")) {
+                alert("Please drop a .docx or .pdf file.");
+                return;
+            }
+            submitBulkExtract(file);
+        });
+    }
 });
 
 async function handleScreenshotUpload(file) {
@@ -448,7 +470,7 @@ async function submitBulkExtract(file) {
         });
         const data = await resp.json();
         if (resp.ok) {
-            statusEl.textContent = `Found ${data.total_found} signatories, added ${data.added} to table.`;
+            statusEl.textContent = `Added ${data.added} signatories to table.`;
             fetchSignatureLog();
         } else {
             statusEl.textContent = data.error || "Extraction failed";

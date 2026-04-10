@@ -6,3 +6,4 @@ openai>=1.78.0
 openpyxl>=3.1.0
 gunicorn
 azure-ai-documentintelligence
+pypdf>=4.0.0

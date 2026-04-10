@@ -19,13 +19,13 @@ from PIL import Image, UnidentifiedImageError
 from documents.json_generator import generate_from_templates
 from services.template_config import get_valid_page_types, get_config
 from services.extraction import extract_fields
-from services.signatures import signatures_bp, add_signature_row
+from services.signatures import signatures_bp, add_signature_row, add_signature_rows_batch
 from services.template_config import template_editor_bp
-from services.bulk_extract import extract_signatories_from_docx
+from services.bulk_extract import extract_signatories_from_docx, extract_signatories_from_pdf
 from services.azure_document_intelligence import image_to_string_azure
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16 MB max upload
+app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024  # 100 MB max upload (large executed PDFs)
 
 # Register the signatures Blueprint
 app.register_blueprint(signatures_bp)
@@ -181,19 +181,30 @@ def bulk_extract():
         return jsonify({"error": "No file provided"}), 400
 
     file = request.files["file"]
-    if not file.filename.endswith(".docx"):
-        return jsonify({"error": "File must be a .docx"}), 400
+    filename_lower = file.filename.lower()
+    if filename_lower.endswith(".pdf"):
+        suffix = ".pdf"
+    elif filename_lower.endswith(".docx"):
+        suffix = ".docx"
+    else:
+        return jsonify({"error": "File must be a .docx or .pdf"}), 400
 
     # Save to temp file
-    with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         file.save(tmp.name)
         tmp_path = tmp.name
 
     try:
-        signatories = extract_signatories_from_docx(tmp_path)
+        if suffix == ".pdf":
+            signatories = extract_signatories_from_pdf(tmp_path)
+        else:
+            signatories, _ = extract_signatories_from_docx(tmp_path)
 
-        # Add each to the signature log
-        added = 0
+        # Collect all valid rows then write in one batch (single load/save cycle).
+        # Deduplicate by (signing_entity, signer_name) — executed PDFs repeat the same
+        # investor across multiple agreement signature pages.
+        batch = []
+        seen_keys = set()
         for sig in signatories:
             fields = {
                 "signer_type": sig.get("signer_type", "entity"),
@@ -212,15 +223,19 @@ def bulk_extract():
                 "address": sig.get("address", ""),
                 "city_state_zip": sig.get("city_state_zip", ""),
             }
-            # Only add if there's at least a name or entity
             if fields["signer_name"] or fields["signing_entity"]:
-                add_signature_row("", fields)
-                added += 1
+                key = (fields["signing_entity"].lower(), fields["signer_name"].lower())
+                if key not in seen_keys:
+                    seen_keys.add(key)
+                    batch.append(fields)
+
+        if batch:
+            add_signature_rows_batch("", batch)
 
         return jsonify({
             "ok": True,
             "total_found": len(signatories),
-            "added": added,
+            "added": len(batch),
             "signatories": signatories,
         })
     except Exception as e:

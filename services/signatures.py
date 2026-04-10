@@ -98,6 +98,16 @@ def add_signature_row(client, fields):
     _safe_save(wb)
 
 
+def add_signature_rows_batch(client, fields_list):
+    """Append multiple signature entries in a single load/save cycle."""
+    ensure_excel()
+    wb = _safe_load()
+    ws = wb.active
+    for fields in fields_list:
+        ws.append(_build_signature_row(client, fields))
+    _safe_save(wb)
+
+
 def get_all_signatures():
     """Read all signature entries from the Excel log."""
     ensure_excel()

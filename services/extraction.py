@@ -89,6 +89,28 @@ Type 4: {{"signing_entity": "Fund LP", "additional_signing_entity": "Fund GP LP"
 
 
 # ---------------------------------------------------------------------------
+# AI scout prompt — identifies signature pages from a compact page index
+# ---------------------------------------------------------------------------
+
+SCOUT_SIGNATURES_PROMPT = """Analyze this PDF page index to identify ALL pages containing signature blocks.
+
+Signature pages typically have:
+- "SIGNATURE PAGE TO [AGREEMENT NAME]" headers
+- Entity or person names with "By:", "Name:", "Title:" fields
+- Bare person names under "INVESTORS:", "STOCKHOLDERS:", "PURCHASERS:" headers
+- Company name followed by signature fields
+
+Return a JSON array of 1-based page numbers that contain signature blocks.
+Example: [85, 86, 87, 88, 89]
+Return ONLY valid JSON — no markdown, no explanation.
+
+Page index:
+---
+{page_index}
+---"""
+
+
+# ---------------------------------------------------------------------------
 # Bulk extraction prompt (returns an array of signers)
 # ---------------------------------------------------------------------------
 
@@ -138,6 +160,139 @@ Examples:
 ]"""
 
 
+SCHEDULE_EXTRACT_PROMPT = """You are extracting investor contact information from a Schedule of Investors (or Schedule of Purchasers) in a legal financing document.
+
+Extract contact details for every investor or purchaser listed. For each, extract:
+- name: Full legal name of the investor or fund (entity name if entity, personal name if individual)
+- email: Email address
+- phone: Phone number
+- address: Street address (street number + street name, suite/floor if present)
+- city_state_zip: City, state and ZIP (e.g. "San Francisco, CA 94105")
+
+Rules:
+- Only include fields you are confident about. Omit any field you cannot determine.
+- If a fund/entity is listed, use the fund name as "name" (not the contact person's name unless the investor is an individual).
+- Return a JSON array. If no contacts found, return [].
+- Return ONLY valid JSON — no markdown, no explanation.
+
+Schedule text:
+---
+{schedule_text}
+---
+
+Example output:
+[
+  {{"name": "Acme Ventures I, LP", "email": "legal@acmevc.com", "address": "100 Main St, Suite 200", "city_state_zip": "San Francisco, CA 94105"}},
+  {{"name": "John Smith", "email": "jsmith@gmail.com", "address": "456 Oak Ave", "city_state_zip": "New York, NY 10001"}}
+]"""
+
+
+BULK_REVIEW_PROMPT = """You are reviewing a heuristic extraction of signature blocks from a legal document.
+
+Original document text:
+---
+{block_text}
+---
+
+Heuristic parser extracted:
+{heuristic_json}
+
+Review the extraction carefully against the original text and fix any errors such as:
+- Wrong signer type (individuals have no signing_entity)
+- Missing fields that are clearly present in the text
+- Fields assigned to the wrong signer
+- Signers that should be split into separate entries or merged
+- Garbled entity names or signer names
+
+Return a corrected JSON array of signer objects using these field names:
+- signing_entity, signer_name, title
+- additional_signing_entity, additional_signing_entity_title
+- additional_signing_entity_2, additional_signing_entity_title_2
+- additional_signing_entity_3, additional_signing_entity_title_3
+- email, phone, cc_email, address, city_state_zip
+
+If the extraction looks correct, return it unchanged.
+Return ONLY valid JSON — no markdown, no explanation."""
+
+
+def review_and_fix_fields(block_text, heuristic_results):
+    """Have AI review and correct a heuristic extraction.
+
+    heuristic_results uses entity_name; this converts to signing_entity for the prompt
+    and returns results in AI format (signing_entity). Falls back to [] on failure.
+    """
+    key = os.environ.get("AZURE_OPENAI_API_KEY")
+    if not key:
+        return []
+
+    # Convert heuristic format (entity_name) → AI format (signing_entity) for the prompt
+    ai_format = []
+    for sig in heuristic_results:
+        converted = {k: v for k, v in sig.items() if k not in ("signer_type", "entity_name")}
+        converted["signing_entity"] = sig.get("entity_name", "")
+        ai_format.append({k: v for k, v in converted.items() if v})
+
+    try:
+        endpoint = os.environ.get("AZURE_OPENAI_BASE_URL")
+        client = OpenAI(base_url=endpoint, api_key=key, timeout=10.0, max_retries=0)
+        completion = client.chat.completions.create(
+            model="gpt-5.4",
+            messages=[{
+                "role": "user",
+                "content": BULK_REVIEW_PROMPT.format(
+                    block_text=block_text,
+                    heuristic_json=json.dumps(ai_format, indent=2),
+                )
+            }],
+        )
+        raw = completion.choices[0].message.content.strip()
+        if raw.startswith("```"):
+            raw = re.sub(r'^```(?:json)?\s*', '', raw)
+            raw = re.sub(r'\s*```$', '', raw)
+        result = json.loads(raw)
+        if isinstance(result, list):
+            return result
+        if isinstance(result, dict):
+            return [result]
+        return []
+    except Exception as e:
+        logger.error(f"AI review error: {e}")
+        return []
+
+
+def extract_contacts_from_schedule(schedule_text):
+    """Extract investor contact info (email, address, phone) from a Schedule of Investors page.
+
+    Returns a list of dicts with keys: name, email, phone, address, city_state_zip.
+    Falls back to [] on failure.
+    """
+    key = os.environ.get("AZURE_OPENAI_API_KEY")
+    if not key:
+        return []
+
+    try:
+        endpoint = os.environ.get("AZURE_OPENAI_BASE_URL")
+        client = OpenAI(base_url=endpoint, api_key=key, timeout=30.0, max_retries=0)
+        completion = client.chat.completions.create(
+            model="gpt-5.4",
+            messages=[{
+                "role": "user",
+                "content": SCHEDULE_EXTRACT_PROMPT.format(schedule_text=schedule_text[:12000])
+            }],
+        )
+        raw = completion.choices[0].message.content.strip()
+        if raw.startswith("```"):
+            raw = re.sub(r'^```(?:json)?\s*', '', raw)
+            raw = re.sub(r'\s*```$', '', raw)
+        result = json.loads(raw)
+        if isinstance(result, list):
+            return result
+        return []
+    except Exception as e:
+        logger.error(f"Schedule contact extraction error: {e}")
+        return []
+
+
 def extract_multiple_fields(block_text):
     """Extract all signers from a block of text using AI.
 
@@ -149,7 +304,7 @@ def extract_multiple_fields(block_text):
 
     try:
         endpoint = os.environ.get("AZURE_OPENAI_BASE_URL")
-        client = OpenAI(base_url=endpoint, api_key=key)
+        client = OpenAI(base_url=endpoint, api_key=key, timeout=10.0, max_retries=0)
         completion = client.chat.completions.create(
             model="gpt-5.4",
             messages=[{
@@ -170,6 +325,35 @@ def extract_multiple_fields(block_text):
     except Exception as e:
         logger.error(f"AI bulk extraction error: {e}")
         return []
+
+
+def scout_signature_pages(page_index):
+    """AI scout: scan a compact page index to identify which pages contain signature blocks.
+
+    Returns a list of 1-based page numbers, or None on failure (caller should
+    fall back to heuristic detection).
+    """
+    key = os.environ.get("AZURE_OPENAI_API_KEY")
+    if not key:
+        return None
+    try:
+        endpoint = os.environ.get("AZURE_OPENAI_BASE_URL")
+        client = OpenAI(base_url=endpoint, api_key=key, timeout=30.0, max_retries=0)
+        completion = client.chat.completions.create(
+            model="gpt-5.4",
+            messages=[{"role": "user", "content": SCOUT_SIGNATURES_PROMPT.format(page_index=page_index)}],
+        )
+        raw = completion.choices[0].message.content.strip()
+        if raw.startswith("```"):
+            raw = re.sub(r'^```(?:json)?\s*', '', raw)
+            raw = re.sub(r'\s*```$', '', raw)
+        result = json.loads(raw)
+        if isinstance(result, list):
+            return [int(p) for p in result if isinstance(p, (int, float))]
+        return None
+    except Exception as e:
+        logger.error(f"Scout signatures error: {e}")
+        return None
 
 
 # # ---------------------------------------------------------------------------

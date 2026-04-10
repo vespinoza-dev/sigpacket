@@ -11,12 +11,16 @@ Extraction priority:
   2. Heuristic parser (parse_signature_block) — fallback if AI is unavailable or fails
 """
 
+import concurrent.futures
 import dataclasses
 import logging
 import re
 from docx import Document
 
 logger = logging.getLogger(__name__)
+
+# Max simultaneous Azure OpenAI calls. Tune down if you hit rate-limit 429s.
+_MAX_CONCURRENT_AI_CALLS = 10
 
 
 def _block_to_text(block_paragraphs):
@@ -54,11 +58,104 @@ def _normalize_ai_result(ai_result):
     return normalized
 
 
+_SIG_FIELD_RE = re.compile(
+    r'(?i)^(by|name|print(?:ed)?\s*name|signatory\s*name|title)\s*:'
+)
+
+# Section headers that introduce bare-name individual signatories (no By:/Name: fields).
+# Pages with these headers + a following non-blank line should pass the gate.
+_BARE_SIGNER_HEADERS = {
+    "INVESTORS", "INVESTOR", "STOCKHOLDERS", "STOCKHOLDER",
+    "PURCHASERS", "PURCHASER", "SHAREHOLDERS", "SHAREHOLDER",
+    "FOUNDERS", "FOUNDER", "SIGNATORIES", "SIGNATORY",
+    "GUARANTORS", "GUARANTOR", "BORROWERS", "BORROWER",
+    "KEY HOLDERS", "KEY HOLDER",
+}
+
+
+def _has_signature_fields(block):
+    """Return True if the block contains signature field labels or a bare-name individual pattern.
+
+    Filters out agreement body text (which has no By:/Name:/Title: labels)
+    before we waste time running the heuristic or an AI call on it.
+
+    Also returns True for pages with an INVESTORS:/STOCKHOLDERS: style header
+    followed by a bare person name — the pattern used for individual signatories
+    in executed PDFs who sign without By:/Name:/Title: fields.
+    """
+    has_signer_header = False
+    for p in block:
+        for line in p.text.split('\n'):
+            stripped = line.strip()
+            if _SIG_FIELD_RE.match(stripped):
+                return True
+            normalized = stripped.rstrip(':').upper()
+            if normalized in _BARE_SIGNER_HEADERS:
+                has_signer_header = True
+            elif has_signer_header and stripped and _looks_like_person_name(stripped):
+                # Person-looking name under a signer-role header → bare individual signer
+                return True
+    return False
+
+
+def _extract_block(block, ai_available):
+    """Extract signatories from a single block. Thread-safe; called concurrently.
+
+    Strategy:
+      0. Skip blocks with no signature field labels (agreement body, exhibits, etc.)
+      1. Run heuristic parser (fast, free).
+      2. If AI is available, have it review and fix the heuristic output.
+         If heuristic found nothing, AI extracts from scratch instead.
+      3. If AI fails, return heuristic results as-is.
+
+    Returns (list_of_signatories, ai_was_used).
+    """
+    # Step 0: gate — skip blocks that have no signature fields at all
+    if not _has_signature_fields(block):
+        return [], False
+
+    # Step 1: heuristic (always runs)
+    heuristic_results = []
+    for sig in parse_signature_block(block):
+        if sig.get("signer_name") or sig.get("entity_name"):
+            heuristic_results.append(sig)
+
+    if not ai_available:
+        return heuristic_results, False
+
+    block_text = _block_to_text(block)
+    if not block_text:
+        return heuristic_results, False
+
+    # Step 2: AI review/fix
+    try:
+        if heuristic_results:
+            # AI reviews and corrects heuristic output
+            from services.extraction import review_and_fix_fields
+            ai_results = review_and_fix_fields(block_text, heuristic_results)
+        else:
+            # Heuristic found nothing — AI extracts from scratch
+            from services.extraction import extract_multiple_fields
+            ai_results = extract_multiple_fields(block_text)
+
+        valid = [
+            _normalize_ai_result(r) for r in ai_results
+            if r and (r.get("signer_name") or r.get("signing_entity"))
+        ]
+        if valid:
+            return valid, True
+    except Exception as e:
+        logger.warning(f"AI step failed for block, using heuristic results: {e}")
+
+    # Step 3: fallback to heuristic
+    return heuristic_results, False
+
+
 def extract_signatories_from_docx(file_path):
     """Extract all signature blocks from a .docx file.
 
-    For each block, tries AI extraction first (Azure OpenAI via extract_fields).
-    Falls back to the heuristic parser if AI is unavailable or returns empty.
+    Blocks are processed concurrently (up to _MAX_CONCURRENT_AI_CALLS at a time)
+    to minimise wall-clock time. Document order is preserved.
 
     Returns a list of dicts, each with:
         entity_name, signer_name, title, additional_signing_entity,
@@ -71,7 +168,7 @@ def extract_signatories_from_docx(file_path):
 
     # Import here to avoid circular imports at module load time
     try:
-        from services.extraction import extract_multiple_fields
+        from services.extraction import extract_multiple_fields  # noqa: F401
         ai_available = True
     except ImportError:
         ai_available = False
@@ -80,33 +177,214 @@ def extract_signatories_from_docx(file_path):
     paragraphs = doc.paragraphs
     blocks = split_into_blocks(paragraphs)
 
+    # Submit all blocks concurrently; iterate futures in submission order to
+    # preserve the original document sequence in the output list.
     signatories = []
-    for block in blocks:
-        sig_added = False
+    ai_used = False
+    with concurrent.futures.ThreadPoolExecutor(max_workers=_MAX_CONCURRENT_AI_CALLS) as executor:
+        futures = [executor.submit(_extract_block, block, ai_available) for block in blocks]
+        for future in futures:
+            block_sigs, block_ai = future.result()
+            signatories.extend(block_sigs)
+            ai_used = ai_used or block_ai
 
-        # --- Try AI extraction first (returns a list — handles multiple signers per block) ---
-        if ai_available:
-            block_text = _block_to_text(block)
-            if block_text:
-                try:
-                    ai_results = extract_multiple_fields(block_text)
-                    valid = [
-                        _normalize_ai_result(r) for r in ai_results
-                        if r and (r.get("signer_name") or r.get("signing_entity"))
-                    ]
-                    if valid:
-                        signatories.extend(valid)
-                        sig_added = True
-                except Exception as e:
-                    logger.warning(f"AI extraction failed for block, falling back to heuristic: {e}")
+    return signatories, ai_used
 
-        # --- Fallback to heuristic parser ---
-        if not sig_added:
-            extracted = parse_signature_block(block)
-            if extracted:
-                for sig in extracted:
-                    if sig.get("signer_name") or sig.get("entity_name"):
-                        signatories.append(sig)
+
+_SCHEDULE_HEADER_RE = re.compile(
+    r'(?i)^schedule\b.{0,60}(?:investors?|purchasers?|stockholders?)'
+)
+
+# Max additional pages to collect after a schedule header is found.
+# Investor schedules rarely exceed 10 pages even for large deals.
+_SCHEDULE_LOOKAHEAD = 10
+
+
+def _is_schedule_page(block):
+    """Return True if the page looks like the start of an investor/purchaser schedule.
+
+    Intentionally strict — only matches schedules whose header explicitly
+    mentions investors or purchasers. Generic schedules (Schedule of Exceptions,
+    etc.) are ignored so their pages don't get excluded from sig detection.
+    """
+    checked = 0
+    for p in block:
+        text = p.text.strip()
+        if not text:
+            continue
+        if _SCHEDULE_HEADER_RE.match(text):
+            return True
+        # Bare "SCHEDULE A" — only match if the page body mentions investors/purchasers
+        if re.match(r'(?i)^(?:schedule|exhibit)\s+[a-z0-9]{1,2}\s*$', text):
+            rest = " ".join(pp.text for pp in block).lower()
+            if any(kw in rest for kw in ('investor', 'purchaser')):
+                return True
+        checked += 1
+        if checked >= 5:
+            break
+    return False
+
+
+def _enrich_with_contacts(signatories, contacts):
+    """Merge schedule contact data into signatories by matching on name (case-insensitive)."""
+    if not contacts:
+        return
+
+    # Build a lookup: normalized name → contact dict
+    contact_map = {}
+    for c in contacts:
+        raw = c.get("name", "").strip()
+        if raw:
+            contact_map[raw.lower()] = c
+
+    for sig in signatories:
+        matched = None
+        for name_field in ("signer_name", "entity_name"):
+            key = sig.get(name_field, "").strip().lower()
+            if key and key in contact_map:
+                matched = contact_map[key]
+                break
+
+        if not matched:
+            continue
+
+        # Only fill in fields that are currently empty
+        for field in ("email", "phone", "address", "city_state_zip"):
+            if not sig.get(field) and matched.get(field):
+                sig[field] = matched[field]
+
+
+class _TextParagraph:
+    """Lightweight stand-in for a docx Paragraph when processing PDF page text."""
+    __slots__ = ("text",)
+    def __init__(self, text):
+        self.text = text
+
+
+def _build_page_index(all_pages):
+    """Build a compact page index for the AI scout: first non-blank line per page."""
+    lines = []
+    for i, text in enumerate(all_pages):
+        first_line = ""
+        for raw_line in text.split('\n'):
+            stripped = raw_line.strip()
+            if stripped:
+                first_line = stripped[:120]
+                break
+        lines.append(f"P{i + 1}: {first_line or '(blank)'}")
+    return "\n".join(lines)
+
+
+def extract_signatories_from_pdf(file_path):
+    """Extract all signature blocks from a PDF file.
+
+    Three-phase approach:
+      Phase 1 — One AI scout call scans a compact page index (first line per
+                page) to identify all signature pages.  Heuristic fallback if
+                the scout fails.  Schedule pages detected by heuristic.
+      Phase 2 — 10 concurrent AI workers extract from the identified signature
+                pages.
+      Phase 3 — One AI call extracts contact info from the investor schedule
+                and enriches the signatories.
+    """
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        raise ValueError("pypdf is required for PDF extraction: pip install pypdf")
+
+    try:
+        reader = PdfReader(file_path)
+    except Exception as e:
+        raise ValueError(f"Failed to read PDF '{file_path}': {e}") from e
+
+    try:
+        from services.extraction import extract_multiple_fields  # noqa: F401
+        ai_available = True
+    except ImportError:
+        ai_available = False
+        logger.warning("extraction module not available; using heuristic only")
+
+    # ── Extract text from every page upfront ──
+    all_pages = [page.extract_text() or "" for page in reader.pages]
+
+    # ── Step 1: Detect schedule pages first (heuristic, always runs) ──
+    # Schedule detection must run before sig detection so schedule pages
+    # are excluded — otherwise investor schedule data leaks into sig results.
+    schedule_texts = []
+    schedule_page_set = set()
+    schedule_lookahead = 0
+    for i, text in enumerate(all_pages):
+        if not text.strip():
+            schedule_lookahead = max(0, schedule_lookahead - 1)
+            continue
+        paras = [_TextParagraph(line) for line in text.split('\n')]
+        if _is_schedule_page(paras):
+            schedule_page_set.add(i)
+            schedule_texts.append(text)
+            schedule_lookahead = _SCHEDULE_LOOKAHEAD
+        elif schedule_lookahead > 0:
+            schedule_page_set.add(i)
+            schedule_texts.append(text)
+            schedule_lookahead -= 1
+
+    # ── Step 2: AI scout identifies signature pages ──
+    sig_page_nums = None
+    if ai_available:
+        try:
+            from services.extraction import scout_signature_pages
+            page_index = _build_page_index(all_pages)
+            sig_page_nums = scout_signature_pages(page_index)
+            if sig_page_nums is not None:
+                # Exclude schedule pages from scout results
+                sig_page_nums = [p for p in sig_page_nums if (p - 1) not in schedule_page_set]
+                logger.info(f"AI scout identified {len(sig_page_nums)} signature pages")
+        except Exception as e:
+            logger.warning(f"AI scout failed, falling back to heuristic: {e}")
+
+    # Fallback: heuristic sig detection excluding schedule pages
+    if sig_page_nums is None:
+        sig_page_nums = []
+        for i, text in enumerate(all_pages):
+            if i in schedule_page_set:
+                continue
+            if text.strip():
+                paras = [_TextParagraph(line) for line in text.split('\n')]
+                if _has_signature_fields(paras):
+                    sig_page_nums.append(i + 1)
+        logger.info(f"Heuristic identified {len(sig_page_nums)} signature pages")
+
+    # Build sig blocks from identified pages
+    sig_blocks = []
+    for pg in sig_page_nums:
+        idx = pg - 1
+        if 0 <= idx < len(all_pages) and all_pages[idx].strip():
+            paras = [_TextParagraph(line) for line in all_pages[idx].split('\n')]
+            sig_blocks.append(paras)
+
+    logger.info(
+        f"Processing {len(sig_blocks)} sig blocks, "
+        f"{len(schedule_texts)} schedule pages"
+    )
+
+    # ── Phase 2: 10 concurrent AI workers on identified sig pages ──
+    signatories = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=_MAX_CONCURRENT_AI_CALLS) as executor:
+        futures = [executor.submit(_extract_block, block, ai_available) for block in sig_blocks]
+        for future in futures:
+            block_sigs, _ = future.result()
+            signatories.extend(block_sigs)
+
+    # ── Phase 3: Enrich with contact info from the investor schedule ──
+    if schedule_texts and ai_available:
+        try:
+            from services.extraction import extract_contacts_from_schedule
+            schedule_combined = "\n".join(schedule_texts)
+            contacts = extract_contacts_from_schedule(schedule_combined)
+            if contacts:
+                logger.info(f"Schedule extraction found {len(contacts)} contacts")
+                _enrich_with_contacts(signatories, contacts)
+        except Exception as e:
+            logger.warning(f"Schedule contact enrichment failed: {e}")
 
     return signatories
 
@@ -169,16 +447,66 @@ def split_into_blocks(paragraphs):
     return blocks
 
 
+def _try_flat_list_split(block):
+    """Split a flat-list format document where signatories are separated by a single blank line.
+
+    Detects the pattern: [entity/person name] → [By:/Name:/Title: content] → [address/email] → [blank]
+    Returns a list of sub-blocks if the pattern is found, otherwise [].
+    """
+    # Split at every single blank paragraph
+    sub_blocks = []
+    current = []
+    for p in block:
+        if not p.text.strip():
+            if current:
+                sub_blocks.append(current)
+                current = []
+        else:
+            current.append(p)
+    if current:
+        sub_blocks.append(current)
+
+    if len(sub_blocks) < 2:
+        return []
+
+    # Each sub-block must: have a non-boilerplate first line AND contain a By:/Name: line.
+    # We don't require the first line to look like an entity/person name because entity-cue
+    # regexes can miss abbreviations like "L.P." at end-of-string.
+    for sub in sub_blocks:
+        first_line = sub[0].text.split('\n')[0].strip()
+        if (not first_line
+                or _has_field_prefix(first_line.lower())
+                or _BOUNDARY_RE.match(first_line)
+                or _looks_like_noise_line(first_line)):
+            return []
+        has_sig_field = any(
+            re.match(r'(?i)^(by|name|print\s*name|printed\s*name)\s*:', line.strip())
+            for p in sub
+            for line in p.text.split('\n')
+        )
+        if not has_sig_field:
+            return []
+
+    return sub_blocks
+
+
 def _resplit_large_block(block):
-    """Split a single large block at gaps of 2+ blank paragraphs."""
-    # Count Name:/By: lines to decide whether resplit is worthwhile.
-    # Only count substantive Name: lines — By: lines are subordinate to
-    # their entity and don't indicate separate signature blocks.
+    """Split a single large block at gaps of 2+ blank paragraphs.
+
+    Also handles flat-list documents where signatories are separated by a single blank line.
+    """
+    # Count Name: lines — check inside embedded newlines too (some docs pack
+    # By:/Name:/Title: into a single multi-line paragraph).
     name_by_count = sum(
         1 for p in block
-        if re.match(r'(?i)^\s*(?:print(?:ed)?|signatory)?\s*name\s*:', p.text)
+        for line in p.text.split('\n')
+        if re.match(r'(?i)^\s*(?:print(?:ed)?|signatory)?\s*name\s*:', line.strip())
     )
     if name_by_count < 2:
+        # Try flat-list format (single blank line between signatories)
+        flat = _try_flat_list_split(block)
+        if flat:
+            return flat
         return [block]
 
     sub_blocks = []
@@ -200,7 +528,9 @@ def _resplit_large_block(block):
         sub_blocks.append(current)
 
     if len(sub_blocks) <= 1:
-        return [block]
+        # 2+ blank splitting didn't work — try single-blank flat-list format
+        flat = _try_flat_list_split(block)
+        return flat if flat else [block]
 
     # Merge sub-blocks that have entity/intermediary content but no actual
     # signer with the following sub-block, so that blank-line gaps inside
@@ -281,6 +611,8 @@ SKIP_PREFIXES = (
     "by executing", "in witness whereof", "the undersigned",
     "very truly yours", "accepted and agreed", "signature page",
     "fax:", "facsimile:", "attn:", "attention:",
+    "for itself",  # e.g. "For itself and as nominee for ..." — signing capacity, not entity name
+    "been executed",  # e.g. "been executed by a duly authorized officer..."
 )
 
 # Regex matching any name label variant: Name:, Print Name:, Printed Name:, Signatory Name:
@@ -341,6 +673,13 @@ _ENTITY_CUE_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Dotted entity suffixes at end-of-string where \b doesn't fire after a trailing "."
+# e.g. "YCP24, L.P." or "SOME FUND, L.L.C."
+_DOTTED_SUFFIX_RE = re.compile(
+    r'(?:^|\W)(?:L\.P\.|L\.L\.C\.|L\.L\.P\.|P\.L\.C\.|N\.V\.|B\.V\.|S\.A\.)\s*$',
+    re.IGNORECASE,
+)
+
 # Regex for nominee/DBA patterns (used in both person and entity detection)
 _NOMINEE_DBA_RE = re.compile(
     r'\b(AS NOMINEE|NOMINEE FOR|d/b/a|f/k/a|ACN\s+\d|ATF\s+)\b', re.IGNORECASE
@@ -349,6 +688,12 @@ _NOMINEE_DBA_RE = re.compile(
 _PERSON_CONNECTORS = {"and", "or"}
 _PERSON_PREFIXES = {"mr", "mrs", "ms", "dr", "prof", "sir", "hon", "h.e", "he"}
 _PERSON_SUFFIXES = {"jr", "sr", "ii", "iii", "iv", "v", "vi"}
+# Words that never appear in person names — rejects "SCHEDULE A", "STOCK PURCHASE AGREEMENT", etc.
+_NON_NAME_WORDS = frozenset({
+    "schedule", "exhibit", "agreement", "certificate", "consent",
+    "amendment", "preferred", "financing", "stock", "purchase",
+    "indemnification", "refusal",
+})
 _NON_SIGNER_PREFIXES = (
     "acting ",
     "signing in the following capacities",
@@ -412,6 +757,11 @@ def _looks_like_person_name(text):
     if not 1 < len(raw_tokens) <= 8:
         return False
 
+    # Reject document/legal titles: "SCHEDULE A", "STOCK PURCHASE AGREEMENT", etc.
+    word_set = {t.lower().strip(".,():;") for t in raw_tokens}
+    if word_set & _NON_NAME_WORDS:
+        return False
+
     personish = 0
     for token in raw_tokens:
         stripped = token.strip("()")
@@ -424,6 +774,9 @@ def _looks_like_person_name(text):
             personish += 1
             continue
         if re.fullmatch(r'[A-Z](?:\.[A-Z])+\.?', stripped) or re.fullmatch(r'[A-Z]\.?', stripped):
+            # Exclude known entity suffixes that look like initials (L.P., N.V., B.V., etc.)
+            if stripped.lower().replace(".", "") in {"lp", "llc", "llp", "plc", "nv", "bv", "sa"}:
+                return False
             personish += 1
             continue
         alpha_only = re.sub(r"[^A-Za-z''-]", "", stripped)
@@ -441,6 +794,8 @@ def _looks_like_entity_name(text):
     if not cleaned:
         return False
     if _ENTITY_CUE_RE.search(cleaned):
+        return True
+    if _DOTTED_SUFFIX_RE.search(cleaned):
         return True
     if _NOMINEE_DBA_RE.search(cleaned):
         return True
@@ -664,7 +1019,13 @@ class _ParserState:
 def parse_signature_block(block_paragraphs):
     """Parse a signature block and extract signatory information."""
     results = []
-    texts = [(p.text, p) for p in block_paragraphs]
+    # Expand paragraphs that pack multiple fields into one block of text with
+    # embedded newlines (e.g. "By: ___\nName: John\nTitle: CEO"). Treating each
+    # line as a separate entry lets all the per-field handlers fire correctly.
+    texts = []
+    for p in block_paragraphs:
+        for line in p.text.split('\n'):
+            texts.append((line, p))
     st = _ParserState()
 
     i = 0
@@ -683,6 +1044,14 @@ def parse_signature_block(block_paragraphs):
             i += 1
             continue
         if _is_entity_header(text):
+            # Flush previous signer and reset — the next signer is NOT
+            # part of whatever entity was accumulated so far.  This is
+            # critical for PDF pages where "POINTONE TECHNOLOGIES, INC."
+            # appears as a header above "INVESTORS:" + a bare person name.
+            if st.signers or st.entity_name:
+                st.flush(results)
+                st.reset_for_new_entity()
+            st.entity_name = ""
             i += 1
             continue
         # Handle signer role prefix + entity name on the same line
@@ -951,8 +1320,28 @@ def parse_signature_block(block_paragraphs):
                     if st.signers:
                         st.flush(results)
                         st.reset_for_new_entity()
-                    st.entity_name = cleaned
+                        st.entity_name = cleaned
+                    elif st.entity_name:
+                        # Multi-line entity name (common in PDFs where fund names
+                        # span two lines, e.g. "BELLTOWER VENTURE\nFUNDS, LP").
+                        # Concatenate instead of overwriting.
+                        st.entity_name = st.entity_name + " " + cleaned
+                    else:
+                        st.entity_name = cleaned
                 else:
+                    # Check for multi-line entity: ALL_CAPS line followed by
+                    # an entity-cue line (e.g. "BELLTOWER VENTURE" + "FUNDS, LP")
+                    if (not st.signers and not st.entity_name
+                            and _looks_like_person_name(cleaned)
+                            and i + 1 < len(texts)):
+                        next_cleaned = _clean_entity_name(texts[i + 1][0].strip())
+                        if next_cleaned and _looks_like_entity_name(next_cleaned):
+                            alpha = [c for c in cleaned if c.isalpha()]
+                            if alpha and sum(1 for c in alpha if c.isupper()) / len(alpha) > 0.7:
+                                st.entity_name = cleaned + " " + next_cleaned
+                                i += 2
+                                continue
+
                     if not st.signers and _looks_like_person_name(cleaned):
                         next_title = ""
                         if i + 1 < len(texts):

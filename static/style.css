@@ -681,9 +681,11 @@ body {
     flex-direction: column;
     gap: 4px;
 }
-.bulk-upload-area:hover {
+.bulk-upload-area:hover,
+.bulk-upload-area.drag-over {
     border-color: var(--drop);
     background: var(--drop-glow);
+    box-shadow: 0 0 0 3px rgba(126,168,196,0.10);
 }
 .upload-group label {
     font-size: 9px;
